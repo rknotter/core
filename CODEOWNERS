@@ -423,6 +423,8 @@ tests/components/image/* @home-assistant/core
 homeassistant/components/incomfort/* @zxdavb
 homeassistant/components/influxdb/* @fabaff @mdegat01
 tests/components/influxdb/* @fabaff @mdegat01
+homeassistant/components/innova/* @rknotter
+tests/components/innova/* @rknotter
 homeassistant/components/input_boolean/* @home-assistant/core
 tests/components/input_boolean/* @home-assistant/core
 homeassistant/components/input_button/* @home-assistant/core
