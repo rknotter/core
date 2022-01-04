@@ -78,7 +78,7 @@ def setup_platform(
 class innova(ClimateEntity):
     """Representation of an Innova Climate Entity."""
 
-    def __init__(self, name, host, unit, hvac_modes, fan_modes, swing_modes):
+    def __init__(self, host, name, unit, hvac_modes, fan_modes, swing_modes):
         """Initialize an Innova Climate Entity."""
         _LOGGER.info("Initialize the Innova climate device")
         self._name = name
