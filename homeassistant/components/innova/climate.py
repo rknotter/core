@@ -83,9 +83,9 @@ class innova(ClimateEntity):
         _LOGGER.info("Initialize the GREE climate device")
         self._name = name
         self._host = host
-        self._hvac_mode = None
-        self._fan_mode = None
-        self._swing_mode = None
+        self._attr_hvac_mode = None
+        self._attr_fan_mode = None
+        self._attr_swing_mode = None
 
         self._attr_fan_modes = fan_modes
         self._attr_swing_modes = swing_modes
