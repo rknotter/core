@@ -68,14 +68,17 @@ def setup_platform(
     _LOGGER.info("Adding Innova climate device")
     _LOGGER.info(host)
     _LOGGER.info(name)
+
+    unit = hass.config.units.temperature_unit
+
     """Add devices"""
-    add_entities([innova(host, name, hvac_modes, fan_modes, swing_modes)])
+    add_entities([innova(host, name, unit, hvac_modes, fan_modes, swing_modes)])
 
 
 class innova(ClimateEntity):
     """Representation of an Innova Climate Entity."""
 
-    def __init__(self, name, host, hvac_modes, fan_modes, swing_modes):
+    def __init__(self, name, host, unit, hvac_modes, fan_modes, swing_modes):
         """Initialize an Innova Climate Entity."""
         _LOGGER.info("Initialize the GREE climate device")
         self._name = name
@@ -87,6 +90,7 @@ class innova(ClimateEntity):
         self._attr_fan_modes = fan_modes
         self._attr_swing_modes = swing_modes
         self._attr_hvac_modes = hvac_modes
+        self._attr_temperature_unit = unit
 
         self._attr_supported_features = SUPPORT_FLAGS
 
