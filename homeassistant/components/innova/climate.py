@@ -80,7 +80,7 @@ class innova(ClimateEntity):
 
     def __init__(self, name, host, unit, hvac_modes, fan_modes, swing_modes):
         """Initialize an Innova Climate Entity."""
-        _LOGGER.info("Initialize the GREE climate device")
+        _LOGGER.info("Initialize the Innova climate device")
         self._name = name
         self._host = host
         self._attr_hvac_mode = None
