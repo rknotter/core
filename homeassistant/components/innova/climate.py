@@ -8,15 +8,7 @@ import voluptuous as vol
 
 # from homeassistant.components import climate
 from homeassistant.components.climate import PLATFORM_SCHEMA, ClimateEntity
-from homeassistant.const import CONF_HOST, CONF_NAME
-from homeassistant.core import HomeAssistant
-import homeassistant.helpers.config_validation as cv
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
-
-# from homeassistant.core import HomeAssistant
-
-""" from homeassistant.components.climate.const import (
+from homeassistant.components.climate.const import (
     HVAC_MODE_AUTO,
     HVAC_MODE_COOL,
     HVAC_MODE_DRY,
@@ -26,8 +18,26 @@ from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
     SUPPORT_FAN_MODE,
     SUPPORT_SWING_MODE,
     SUPPORT_TARGET_TEMPERATURE,
-) """
-# from homeassistant.components.fan import SPEED_HIGH, SPEED_LOW, SPEED_MEDIUM
+)
+from homeassistant.components.fan import SPEED_HIGH, SPEED_LOW, SPEED_MEDIUM
+from homeassistant.const import CONF_HOST, CONF_NAME
+from homeassistant.core import HomeAssistant
+import homeassistant.helpers.config_validation as cv
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
+
+SUPPORT_FLAGS = SUPPORT_TARGET_TEMPERATURE | SUPPORT_FAN_MODE | SUPPORT_SWING_MODE
+HVAC_MODES = [
+    HVAC_MODE_AUTO,
+    HVAC_MODE_COOL,
+    HVAC_MODE_DRY,
+    HVAC_MODE_FAN_ONLY,
+    HVAC_MODE_HEAT,
+    HVAC_MODE_OFF,
+]
+FAN_MODES = ["Auto", SPEED_LOW, "Low", SPEED_MEDIUM, "Medium", SPEED_HIGH, "High"]
+SWING_MODES = ["Stop", "Swing"]
+
 
 _LOGGER = logging.getLogger(__name__)
 DEFAULT_NAME = "Innova Climate"
@@ -51,26 +61,32 @@ def setup_platform(
     """The configuration check takes care they are present."""
     host = config[CONF_HOST]
     name = config[CONF_NAME]
+    hvac_modes = HVAC_MODES
+    fan_modes = FAN_MODES
+    swing_modes = SWING_MODES
 
     _LOGGER.info("Adding Innova climate device")
     _LOGGER.info(host)
     _LOGGER.info(name)
     """Add devices"""
-    add_entities([innova(host, name)])
+    add_entities([innova(host, name, hvac_modes, fan_modes, swing_modes)])
 
 
 class innova(ClimateEntity):
     """Representation of an Innova Climate Entity."""
 
-    def __init__(
-        self,
-        name,
-        host,
-    ):
+    def __init__(self, name, host, hvac_modes, fan_modes, swing_modes):
         """Initialize an Innova Climate Entity."""
         _LOGGER.info("Initialize the GREE climate device")
         self._name = name
         self._host = host
+        self.hvac_mode = None
+        self.fan_mode = None
+        self.swing_mode = None
+
+        self.hvac_modes = hvac_modes
+        self.fan_modes = fan_modes
+        self.swing_modes = swing_modes
 
     @property
     def name(self) -> str:
