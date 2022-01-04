@@ -132,3 +132,7 @@ tmp_cache
 
 # python-language-server / Rope
 .ropeproject
+homeassistant/components/innova/config_flow_old.py
+homeassistant/components/innova/init_old.py
+homeassistant/components/innova/config_flow.py
+homeassistant/components/innova/climate.py
