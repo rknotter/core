@@ -84,9 +84,11 @@ class innova(ClimateEntity):
         self._fan_mode = None
         self._swing_mode = None
 
-        self._hvac_modes = hvac_modes
-        self._fan_modes = fan_modes
-        self._swing_modes = swing_modes
+        self._attr_fan_modes = fan_modes
+        self._attr_swing_modes = swing_modes
+        self._attr_hvac_modes = hvac_modes
+
+        self._attr_supported_features = SUPPORT_FLAGS
 
     @property
     def name(self) -> str:
