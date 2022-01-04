@@ -9,9 +9,10 @@ import voluptuous as vol
 # from homeassistant.components import climate
 from homeassistant.components.climate import PLATFORM_SCHEMA, ClimateEntity
 from homeassistant.const import CONF_HOST, CONF_NAME
+from homeassistant.core import HomeAssistant
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import ConfigType
+from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
 # from homeassistant.core import HomeAssistant
 
@@ -41,9 +42,11 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
 
 
 def setup_platform(
+    hass: HomeAssistant,
     config: ConfigType,
     add_entities: AddEntitiesCallback,
-):
+    discovery_info: DiscoveryInfoType | None = None,
+) -> None:
     """Assign configuration variables."""
     """The configuration check takes care they are present."""
     host = config[CONF_HOST]
