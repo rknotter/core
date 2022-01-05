@@ -73,10 +73,10 @@ def setup_platform(
 
 
 class innova(ClimateEntity):
-    """Representation of an Innova Climate Entity."""
+    """Representation of an Innova Climate Device."""
 
     def __init__(self, host, name, unit, hvac_modes, fan_modes, swing_modes):
-        """Initialize an Innova Climate Entity."""
+        """Initialize an Innova Climate Device."""
         _LOGGER.info("Initialize the Innova climate device")
         self._name = name
         self._host = host
@@ -88,6 +88,7 @@ class innova(ClimateEntity):
         self._attr_swing_modes = swing_modes
         self._attr_hvac_modes = hvac_modes
         self._attr_temperature_unit = unit
+        self._attr_unique_id = "climate." + name
 
         self._attr_supported_features = SUPPORT_FLAGS
 
@@ -98,3 +99,8 @@ class innova(ClimateEntity):
     def name(self) -> str:
         """Return the display name of this climate device."""
         return self._name
+
+    @property
+    def unique_id(self):
+        """Return the unique id of this climate device."""
+        return self._unique_id
