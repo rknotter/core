@@ -1,9 +1,13 @@
 """Platform for innova ariconditioner integration."""
 from __future__ import annotations
 
+# import asyncio
+import json
+
 # from configparser import ConfigParser
 import logging
 
+import requests
 import voluptuous as vol
 
 # from homeassistant.components import climate
@@ -35,7 +39,7 @@ HVAC_MODES = [
     HVAC_MODE_HEAT,
     HVAC_MODE_OFF,
 ]
-FAN_MODES = ["Auto", SPEED_LOW, "Low", SPEED_MEDIUM, "Medium", SPEED_HIGH, "High"]
+FAN_MODES = ["Auto", SPEED_LOW, SPEED_MEDIUM, SPEED_HIGH]
 SWING_MODES = ["Stop", "Swing"]
 
 
@@ -77,23 +81,29 @@ class innova(ClimateEntity):
 
     def __init__(self, host, name, unit, hvac_modes, fan_modes, swing_modes):
         """Initialize an Innova Climate Device."""
-        _LOGGER.info("Initialize the Innova climate device")
+        _LOGGER.info(
+            "Initialize the Innova climate device '" + name + "' at address: " + host
+        )
         self._name = name
         self._host = host
+        self._unique_id = "climate." + name
         self._attr_hvac_mode = None
         self._attr_fan_mode = None
         self._attr_swing_mode = None
+        self._attr_target_temperature = None
+        self._attr_current_temperature = None
 
         self._attr_fan_modes = fan_modes
         self._attr_swing_modes = swing_modes
         self._attr_hvac_modes = hvac_modes
         self._attr_temperature_unit = unit
-        self._attr_unique_id = "climate." + name
 
         self._attr_supported_features = SUPPORT_FLAGS
 
-        _LOGGER.info(host)
-        _LOGGER.info(name)
+    @property
+    def should_poll(self):
+        """Return the polling state."""
+        return True
 
     @property
     def name(self) -> str:
@@ -104,3 +114,41 @@ class innova(ClimateEntity):
     def unique_id(self):
         """Return the unique id of this climate device."""
         return self._unique_id
+
+    @property
+    def hvac_mode(self):
+        """Return current operation."""
+        return self._attr_hvac_mode
+
+    def update(self):
+        """Update HA state from device."""
+        _LOGGER.info("Innova update()")
+        self.SyncState()
+
+    async def SyncState(self):
+        """Fetch current settings from climate device."""
+        _LOGGER.info("Starting SyncState")
+
+        """Initialize the receivedJsonPayload variable (for return)"""
+        receivedJsonPayload = ""
+        url = "http://" + self._host + "/api/v/1/status"
+        _LOGGER.info("Getting information from: " + url)
+
+        r = await self.hass.async_add_executor_job(requests.get, url)
+
+        receivedJsonPayload = json.loads(r.content)
+
+        _LOGGER.info(receivedJsonPayload)
+        if int(receivedJsonPayload["RESULT"]["ps"]) == 0:
+            self._attr_hvac_mode = HVAC_MODE_OFF
+
+        self._attr_target_temperature = int(receivedJsonPayload["RESULT"]["sp"])
+        _LOGGER.info("Target temp = " + str(self._attr_target_temperature))
+        self._attr_current_temperature = int(receivedJsonPayload["RESULT"]["t"])
+        _LOGGER.info("Current temp = " + str(self._attr_current_temperature))
+        return receivedJsonPayload
+
+    async def async_added_to_hass(self):
+        """Device successfully added."""
+        _LOGGER.info("Innova climate device added to hass()")
+        await self.SyncState()
