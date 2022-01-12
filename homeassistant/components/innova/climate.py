@@ -14,19 +14,16 @@ import voluptuous as vol
 
 # from homeassistant.components import climate
 from homeassistant.components.climate import PLATFORM_SCHEMA, ClimateEntity
-from homeassistant.components.climate.const import (
+from homeassistant.components.climate.const import (  # HVAC_MODE_DRY,; HVAC_MODE_FAN_ONLY,; HVAC_MODE_HEAT,
     HVAC_MODE_AUTO,
     HVAC_MODE_COOL,
-    HVAC_MODE_DRY,
-    HVAC_MODE_FAN_ONLY,
-    HVAC_MODE_HEAT,
     HVAC_MODE_OFF,
     SUPPORT_FAN_MODE,
     SUPPORT_SWING_MODE,
     SUPPORT_TARGET_TEMPERATURE,
 )
 from homeassistant.components.fan import SPEED_HIGH, SPEED_LOW, SPEED_MEDIUM
-from homeassistant.const import ATTR_TEMPERATURE, CONF_HOST, CONF_NAME
+from homeassistant.const import ATTR_TEMPERATURE, CONF_HOST, CONF_NAME, TEMP_CELSIUS
 from homeassistant.core import HomeAssistant
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -39,9 +36,9 @@ SUPPORT_FLAGS = SUPPORT_TARGET_TEMPERATURE | SUPPORT_FAN_MODE | SUPPORT_SWING_MO
 HVAC_MODES = [
     HVAC_MODE_AUTO,
     HVAC_MODE_COOL,
-    HVAC_MODE_DRY,
-    HVAC_MODE_FAN_ONLY,
-    HVAC_MODE_HEAT,
+    #    HVAC_MODE_DRY,
+    #   HVAC_MODE_FAN_ONLY,
+    #    HVAC_MODE_HEAT,
     HVAC_MODE_OFF,
 ]
 FAN_MODES = ["Auto", SPEED_LOW, SPEED_MEDIUM, SPEED_HIGH]
@@ -97,8 +94,8 @@ class innova(ClimateEntity):
         self._attr_swing_mode = None
         self._attr_target_temperature = None
         self._attr_current_temperature = None
-        self._attr_target_temperature_high = 25
-        self._attr_target_temperature_low = 18
+        self._attr_target_temperature_high = 31
+        self._attr_target_temperature_low = 16
         self._attr_target_temperature_step = 1
 
         self._attr_fan_modes = fan_modes
@@ -109,7 +106,7 @@ class innova(ClimateEntity):
         self._attr_supported_features = SUPPORT_FLAGS
 
         self.is_available = False
-        self.NeedToSend = False
+        self.needToSend = False
 
     @property
     def should_poll(self):
@@ -132,77 +129,146 @@ class innova(ClimateEntity):
         return self._attr_hvac_mode
 
     @property
+    def hvac_modes(self):
+        """Return the list of available hvac operation modes."""
+        return self._attr_hvac_modes
+
+    @property
     def swing_mode(self):
         """Return current swing mode."""
         return self._attr_swing_mode
+
+    @property
+    def swing_modes(self):
+        """Return possible swing modes."""
+        return self._attr_swing_modes
 
     @property
     def available(self):
         """Return if the device is available for communication."""
         return self.is_available
 
+    @property
+    def temperature_unit(self):
+        """Return the unit of measurement used by the platform."""
+        return TEMP_CELSIUS
+
+    @property
+    def target_temperature_step(self):
+        """Return target temperature step."""
+        return self._attr_target_temperature_step
+
+    @property
+    def current_temperature(self):
+        """Return current reported temperature by the device."""
+        return self._attr_current_temperature
+
+    @property
+    def min_temp(self):
+        """Return the minimum temperature."""
+        return self._attr_target_temperature_low
+
+    @property
+    def max_temp(self):
+        """Return the maximum temperature."""
+        return self._attr_target_temperature_high
+
     async def async_update(self):
         """Update HA state from device."""
         _LOGGER.info("Innova update()")
-        await self.SyncState(self.NeedToSend)
+        await self.SyncState()
+        # Ensure we update the current operation after running update
+        self.schedule_update_ha_state()
         return
 
-    async def SyncState(self, NeedToSend):
+    async def SyncState(self):
         """Fetch current settings from climate device."""
         _LOGGER.info("Starting SyncState")
 
-        """Initialize the receivedJsonPayload variable (for return)"""
+        """Initialize the receivedJsonPayload and r variable."""
         receivedJsonPayload = ""
-        if not NeedToSend:
-            url = "http://" + self._host + "/api/v/1/status"
-            _LOGGER.info("Getting information from: " + url)
+        r = None
 
-            try:
-                r = await self.hass.async_add_executor_job(requests.get, url)
+        url = "http://" + self._host + "/api/v/1/status"
+        _LOGGER.info("Getting data from: " + url)
+        try:
+            r = await self.hass.async_add_executor_job(requests.get, url)
+            if r is not None:
                 receivedJsonPayload = json.loads(r.content)
 
-                _LOGGER.info(receivedJsonPayload)
+            # _LOGGER.info(receivedJsonPayload)
+            if bool(receivedJsonPayload["success"]):
                 if int(receivedJsonPayload["RESULT"]["ps"]) == 0:
                     self._attr_hvac_mode = HVAC_MODE_OFF
+                elif int(receivedJsonPayload["RESULT"]["wm"]) == 5:
+                    self._attr_hvac_mode = HVAC_MODE_AUTO
+                elif int(receivedJsonPayload["RESULT"]["wm"]) == 1:
+                    self._attr_hvac_mode = HVAC_MODE_COOL
 
                 self._attr_target_temperature = int(receivedJsonPayload["RESULT"]["sp"])
-                _LOGGER.info("Target temp = " + str(self._attr_target_temperature))
                 self._attr_current_temperature = int(receivedJsonPayload["RESULT"]["t"])
+
+                _LOGGER.info("Current HVAC mode = " + str(self._attr_hvac_mode))
+                _LOGGER.info("Target temp = " + str(self._attr_target_temperature))
                 _LOGGER.info("Current temp = " + str(self._attr_current_temperature))
-
-                self.is_available = True
-            except Exception as err:
-                _LOGGER.error(err)
-            return
-
-        else:
-            _LOGGER.info("Send data to device.")
-            self.NeedToSend = False
-            # Ensure we update the current operation after changing the mode
-            self.schedule_update_ha_state()
-            return
-
-    def set_hvac_mode(self, hvac_mode):
-        """Set HVAC mode."""
-        self._attr_hvac_mode = hvac_mode
-        _LOGGER.info(f"Mode moet worden: {self._attr_hvac_mode}")
-        self.NeedToSend = True
+                """Confirm that the device is available after receiving data"""
+                if not self.is_available:
+                    self.is_available = True
+        except Exception as err:
+            _LOGGER.error(err)
         return
 
-    def set_temperature(self, **kwargs):
+    async def async_send_command(self, command):
+        """Send command to device."""
+        url = "http://" + self._host + "/api/v/1/" + command
+        try:
+            _LOGGER.info(f"Send {url} to device.")
+            await self.hass.async_add_executor_job(requests.post, url)
+
+        except Exception as err:
+            _LOGGER.error(err)
+        return
+
+    async def async_set_hvac_mode(self, hvac_mode):
+        """Set HVAC mode."""
+        """If the HVAC mode differs from the current mode."""
+        if not self._attr_hvac_mode == hvac_mode:
+            self._attr_hvac_mode = hvac_mode
+            _LOGGER.info(f"Switching to mode: {self._attr_hvac_mode}")
+
+            if self._attr_hvac_mode == HVAC_MODE_OFF:
+                command = "power/off"
+            else:
+                command = "power/on"
+            await self.async_send_command(command)
+            return
+        else:
+            _LOGGER.info(
+                f"Device is already in desired mode: {self._attr_hvac_mode}. This does nothing."
+            )
+            return
+
+    async def async_set_temperature(self, **kwargs):
         """Set temperature."""
         if (temperature := kwargs.get(ATTR_TEMPERATURE)) is None:
             return
         self._attr_target_temperature = temperature
-        _LOGGER.info(f"Temp moet worden: {self._attr_target_temperature}")
-        self.NeedToSend = True
+        _LOGGER.info(f"Desired temperature: {self._attr_target_temperature}")
+        command = "set/setpoint?p_temp=" + str(int(self._attr_target_temperature))
+        await self.async_send_command(command)
         return
 
-    def set_swing_mode(self, swing_mode: str):
+    async def async_set_swing_mode(self, swing_mode: str):
         """Set swing mode."""
         self._attr_swing_mode = swing_mode
-        _LOGGER.info(f"Swing mode moet worden: {self._attr_swing_mode}")
-        self.NeedToSend = True
+        _LOGGER.info(f"Set swing mode to: {self._attr_swing_mode}")
+        # self.needToSend = True
+        return
+
+    async def async_set_fan_mode(self, fan_mode: str):
+        """Set fan mode."""
+        self._attr_fan_mode = fan_mode
+        _LOGGER.info(f"Set fan mode to: {self._attr_fan_mode}")
         return
 
     async def async_added_to_hass(self):
