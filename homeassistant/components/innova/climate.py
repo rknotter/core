@@ -14,15 +14,25 @@ import voluptuous as vol
 
 # from homeassistant.components import climate
 from homeassistant.components.climate import PLATFORM_SCHEMA, ClimateEntity
-from homeassistant.components.climate.const import (  # HVAC_MODE_DRY,; HVAC_MODE_FAN_ONLY,; HVAC_MODE_HEAT,
+from homeassistant.components.climate.const import (
+    FAN_AUTO,
+    FAN_HIGH,
+    FAN_LOW,
+    FAN_MEDIUM,
     HVAC_MODE_AUTO,
     HVAC_MODE_COOL,
+    HVAC_MODE_DRY,
+    HVAC_MODE_FAN_ONLY,
+    HVAC_MODE_HEAT,
     HVAC_MODE_OFF,
     SUPPORT_FAN_MODE,
     SUPPORT_SWING_MODE,
     SUPPORT_TARGET_TEMPERATURE,
+    SWING_OFF,
+    SWING_ON,
 )
-from homeassistant.components.fan import SPEED_HIGH, SPEED_LOW, SPEED_MEDIUM
+
+# from homeassistant.components.fan import SPEED_HIGH, SPEED_LOW, SPEED_MEDIUM
 from homeassistant.const import ATTR_TEMPERATURE, CONF_HOST, CONF_NAME, TEMP_CELSIUS
 from homeassistant.core import HomeAssistant
 import homeassistant.helpers.config_validation as cv
@@ -34,16 +44,17 @@ from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
 SUPPORT_FLAGS = SUPPORT_TARGET_TEMPERATURE | SUPPORT_FAN_MODE | SUPPORT_SWING_MODE
 HVAC_MODES = [
-    HVAC_MODE_AUTO,
-    HVAC_MODE_COOL,
-    #    HVAC_MODE_DRY,
-    #   HVAC_MODE_FAN_ONLY,
-    #    HVAC_MODE_HEAT,
+    HVAC_MODE_AUTO,  # = 5
+    HVAC_MODE_COOL,  # = 1
+    HVAC_MODE_DRY,  # = 3
+    HVAC_MODE_FAN_ONLY,  # = 4
+    HVAC_MODE_HEAT,  # = 0
     HVAC_MODE_OFF,
 ]
-FAN_MODES = ["Auto", SPEED_LOW, SPEED_MEDIUM, SPEED_HIGH]
-SWING_MODES = ["Stop", "Swing"]
-
+FAN_MODES = [FAN_AUTO, FAN_LOW, FAN_MEDIUM, FAN_HIGH]  # fs [0, 1, 2, 3 ]
+SWING_MODES = [SWING_OFF, SWING_ON]  # fr = [7, 0]
+# NIGHT MODE = nm = 0, 1
+# POWER = ps = 0, 1
 
 _LOGGER = logging.getLogger(__name__)
 DEFAULT_NAME = "Innova Climate"
@@ -106,7 +117,7 @@ class innova(ClimateEntity):
         self._attr_supported_features = SUPPORT_FLAGS
 
         self.is_available = False
-        self.needToSend = False
+        self.url = "http://" + self._host + "/api/v/1/"
 
     @property
     def should_poll(self):
@@ -189,7 +200,7 @@ class innova(ClimateEntity):
         receivedJsonPayload = ""
         r = None
 
-        url = "http://" + self._host + "/api/v/1/status"
+        url = self.url + "status"
         _LOGGER.info("Getting data from: " + url)
         try:
             r = await self.hass.async_add_executor_job(requests.get, url)
@@ -198,19 +209,45 @@ class innova(ClimateEntity):
 
             # _LOGGER.info(receivedJsonPayload)
             if bool(receivedJsonPayload["success"]):
+                """Retrieve current working mode from device."""
                 if int(receivedJsonPayload["RESULT"]["ps"]) == 0:
                     self._attr_hvac_mode = HVAC_MODE_OFF
-                elif int(receivedJsonPayload["RESULT"]["wm"]) == 5:
-                    self._attr_hvac_mode = HVAC_MODE_AUTO
-                elif int(receivedJsonPayload["RESULT"]["wm"]) == 1:
-                    self._attr_hvac_mode = HVAC_MODE_COOL
+                else:
+                    if int(receivedJsonPayload["RESULT"]["wm"]) == 0:
+                        self._attr_hvac_mode = HVAC_MODE_HEAT
+                    elif int(receivedJsonPayload["RESULT"]["wm"]) == 1:
+                        self._attr_hvac_mode = HVAC_MODE_COOL
+                    # elif int(receivedJsonPayload["RESULT"]["wm"]) == 2:
+                    #    self._attr_hvac_mode = HVAC_MODE_
+                    elif int(receivedJsonPayload["RESULT"]["wm"]) == 3:
+                        self._attr_hvac_mode = HVAC_MODE_DRY
+                    elif int(receivedJsonPayload["RESULT"]["wm"]) == 4:
+                        self._attr_hvac_mode = HVAC_MODE_FAN_ONLY
+                    elif int(receivedJsonPayload["RESULT"]["wm"]) == 5:
+                        self._attr_hvac_mode = HVAC_MODE_AUTO
 
                 self._attr_target_temperature = int(receivedJsonPayload["RESULT"]["sp"])
                 self._attr_current_temperature = int(receivedJsonPayload["RESULT"]["t"])
 
+                if int(receivedJsonPayload["RESULT"]["fs"]) == 0:
+                    self._attr_fan_mode = FAN_AUTO
+                elif int(receivedJsonPayload["RESULT"]["fs"]) == 1:
+                    self._attr_fan_mode = FAN_LOW
+                elif int(receivedJsonPayload["RESULT"]["fs"]) == 2:
+                    self._attr_fan_mode = FAN_MEDIUM
+                elif int(receivedJsonPayload["RESULT"]["fs"]) == 3:
+                    self._attr_fan_mode = FAN_HIGH
+
+                if int(receivedJsonPayload["RESULT"]["fr"]) == 7:
+                    self._attr_swing_mode = SWING_OFF
+                elif int(receivedJsonPayload["RESULT"]["fr"]) == 0:
+                    self._attr_swing_mode = SWING_ON
+
                 _LOGGER.info("Current HVAC mode = " + str(self._attr_hvac_mode))
                 _LOGGER.info("Target temp = " + str(self._attr_target_temperature))
                 _LOGGER.info("Current temp = " + str(self._attr_current_temperature))
+                _LOGGER.info("Current FAN mode = " + str(self._attr_fan_mode))
+                _LOGGER.info("Current SWING mode = " + str(self._attr_swing_mode))
                 """Confirm that the device is available after receiving data"""
                 if not self.is_available:
                     self.is_available = True
@@ -220,7 +257,7 @@ class innova(ClimateEntity):
 
     async def async_send_command(self, command):
         """Send command to device."""
-        url = "http://" + self._host + "/api/v/1/" + command
+        url = self.url + command
         try:
             _LOGGER.info(f"Send {url} to device.")
             await self.hass.async_add_executor_job(requests.post, url)
@@ -238,13 +275,25 @@ class innova(ClimateEntity):
 
             if self._attr_hvac_mode == HVAC_MODE_OFF:
                 command = "power/off"
+            elif self._attr_hvac_mode == HVAC_MODE_HEAT:
+                command = "set/mode/heating"
+            elif self._attr_hvac_mode == HVAC_MODE_COOL:
+                command = "set/mode/cooling"
+            elif self._attr_hvac_mode == HVAC_MODE_DRY:
+                command = "set/mode/dehumidification"
+            elif self._attr_hvac_mode == HVAC_MODE_FAN_ONLY:
+                command = "set/mode/fanonly"
+            elif self._attr_hvac_mode == HVAC_MODE_AUTO:
+                command = "set/mode/auto"
+
+            if command is not None:
+                await self.async_send_command(command)
             else:
-                command = "power/on"
-            await self.async_send_command(command)
+                _LOGGER.error(f"{hvac_mode} is not a supported HVAC mode.")
             return
         else:
             _LOGGER.info(
-                f"Device is already in desired mode: {self._attr_hvac_mode}. This does nothing."
+                f"HVAC mode is already {self._attr_hvac_mode}. Not sending the command."
             )
             return
 
@@ -252,23 +301,59 @@ class innova(ClimateEntity):
         """Set temperature."""
         if (temperature := kwargs.get(ATTR_TEMPERATURE)) is None:
             return
-        self._attr_target_temperature = temperature
-        _LOGGER.info(f"Desired temperature: {self._attr_target_temperature}")
-        command = "set/setpoint?p_temp=" + str(int(self._attr_target_temperature))
-        await self.async_send_command(command)
+        if not int(self._attr_target_temperature) == int(temperature):
+            self._attr_target_temperature = int(temperature)
+            _LOGGER.info(
+                f"Setting target temperature to: {self._attr_target_temperature}"
+            )
+            command = "set/setpoint?p_temp=" + str(self._attr_target_temperature)
+            await self.async_send_command(command)
+        else:
+            _LOGGER.info(
+                f"Target temperature is already {temperature}. Not sending the command."
+            )
         return
 
-    async def async_set_swing_mode(self, swing_mode: str):
+    async def async_set_swing_mode(self, swing_mode):
         """Set swing mode."""
-        self._attr_swing_mode = swing_mode
-        _LOGGER.info(f"Set swing mode to: {self._attr_swing_mode}")
-        # self.needToSend = True
+        if not self._attr_swing_mode == swing_mode:
+            self._attr_swing_mode = swing_mode
+            _LOGGER.info(f"Set swing mode to: {self._attr_swing_mode}")
+            if swing_mode == SWING_ON:
+                command = "set/feature/rotation?value=0"
+            elif swing_mode == SWING_OFF:
+                command = "set/feature/rotation?value=7"
+            if command is not None:
+                await self.async_send_command(command)
+            else:
+                _LOGGER.error(f"{swing_mode} is not a supported swing mode")
+            return
+        else:
+            _LOGGER.info(
+                f"Swing mode is already {swing_mode}. Not sending the command."
+            )
         return
 
-    async def async_set_fan_mode(self, fan_mode: str):
+    async def async_set_fan_mode(self, fan_mode):
         """Set fan mode."""
-        self._attr_fan_mode = fan_mode
-        _LOGGER.info(f"Set fan mode to: {self._attr_fan_mode}")
+        if not self._attr_fan_mode == fan_mode:
+            self._attr_fan_mode = fan_mode
+            _LOGGER.info(f"Set fan mode to: {self._attr_fan_mode}")
+            if fan_mode == FAN_AUTO:
+                command = "set/fan?value=0"
+            elif fan_mode == FAN_LOW:
+                command = "set/fan?value=1"
+            elif fan_mode == FAN_MEDIUM:
+                command = "set/fan?value=2"
+            elif fan_mode == FAN_HIGH:
+                command = "set/fan?value=3"
+            if command is not None:
+                await self.async_send_command(command)
+            else:
+                _LOGGER.error(f"{fan_mode} is not a supported fan mode")
+            return
+        else:
+            _LOGGER.info(f"Fan mode is already {fan_mode}. Not sending the command.")
         return
 
     async def async_added_to_hass(self):
