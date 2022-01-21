@@ -58,6 +58,8 @@ SWING_MODES = [SWING_OFF, SWING_ON]  # fr = [7, 0]
 
 _LOGGER = logging.getLogger(__name__)
 DEFAULT_NAME = "Innova Climate"
+DOMAIN = "innova"
+PLATFORMS = ["climate"]
 
 # Validation of the user's configuration
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(

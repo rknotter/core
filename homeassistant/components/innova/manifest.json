@@ -1,12 +1,8 @@
 {
   "domain": "innova",
   "name": "Innova HVAC",
-  "config_flow": false,
   "documentation": "https://www.home-assistant.io/integrations/innova",
   "requirements": [],
-  "ssdp": [],
-  "zeroconf": [],
-  "homekit": {},
   "dependencies": [],
   "codeowners": [
     "@rknotter"
